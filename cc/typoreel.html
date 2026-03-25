@@ -10,9 +10,11 @@
 </head>
 <body>
 <header>
-  <div class="logo"><h1>TYPOREEL</h1><span class="vtag">@projecloom(github)</span></div>
+  <div class="logo"><h1>TYPOREEL</h1><span class="vtag">v4 · PREMIUM</span></div>
   <div class="hbtns">
-    <button class="hbtn hbtn-ghost" id="exportBtn">⬇ DOWNLOAD MP4</button>
+    <button class="hbtn hbtn-ghost" id="exportBtn" onclick="doExport()">🎬 MP4</button>
+    <button class="hbtn hbtn-ghost" style="padding:5px 10px" onclick="doExportGif()">🎞 GIF</button>
+    <button class="hbtn hbtn-ghost" style="padding:5px 10px" onclick="doExportFrames()">🗂 FRAMES</button>
     <button class="hbtn hbtn-gold" id="playBtn">▶ GENERATE</button>
   </div>
 </header>
@@ -72,7 +74,15 @@
         <span class="tog-lbl">Transparent BG</span>
         <label class="tog"><input type="checkbox" id="togTransparent" checked><div class="tog-track"></div><div class="tog-thumb"></div></label>
       </div>
-      <button class="hbtn hbtn-ghost" id="exportBtnSec" style="width:100%;margin-top:4px;font-size:10px">⬇ DOWNLOAD MP4</button>
+      <div style="display:flex;flex-direction:column;gap:5px;margin-top:6px">
+        <button id="exportBtnSec" onclick="doExport()" style="width:100%;padding:8px;font-size:9.5px;font-weight:700;letter-spacing:1px;cursor:pointer;background:var(--titlebar);color:#fff;border:1.5px solid rgba(0,0,0,.2);font-family:'Oswald',sans-serif;text-transform:uppercase;box-shadow:2px 2px 0 #8a4820;transition:all .1s">🎬 DOWNLOAD MP4</button>
+        <button id="exportGifBtn" onclick="doExportGif()" style="width:100%;padding:8px;font-size:9.5px;font-weight:700;letter-spacing:1px;cursor:pointer;background:var(--yellow);color:#261c10;border:1.5px solid rgba(0,0,0,.2);font-family:'Oswald',sans-serif;text-transform:uppercase;box-shadow:2px 2px 0 #8a6800;transition:all .1s">🎞 EXPORT GIF</button>
+        <button id="exportFramesBtn" onclick="doExportFrames()" style="width:100%;padding:8px;font-size:9.5px;font-weight:700;letter-spacing:1px;cursor:pointer;background:var(--panel2);color:var(--sub);border:1.5px solid var(--border);font-family:'Oswald',sans-serif;text-transform:uppercase;box-shadow:2px 2px 0 var(--border);transition:all .1s">🗂 EXPORT FRAMES</button>
+      </div>
+      <div id="exportProgress" style="display:none;margin-top:8px;padding:7px;background:var(--panel2);border:1px solid var(--border);font-size:9px;font-family:monospace;color:var(--sub)">
+        <div id="exportProgressBar" style="height:4px;background:var(--titlebar);width:0%;transition:width .2s;margin-bottom:4px"></div>
+        <span id="exportProgressTxt">Preparing…</span>
+      </div>
     </div>
   </div>
 
@@ -419,6 +429,6 @@
 </div>
 </div>
 
-<script src="typoreel.js"></script>  
+<script src="typoreel.js"></script>
 </body>
 </html>
