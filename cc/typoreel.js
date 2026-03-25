@@ -480,136 +480,364 @@ function startAnim(){
   raf=requestAnimationFrame(frame);updateStats();
 }
 
-// ─── EXPORT MP4 via MediaRecorder ────────────────────────────────────────────
-async function doExport(){
-  const allBtns=[document.getElementById('exportBtn'),document.getElementById('exportBtnSec')];
-  const setBtn=(txt,dis)=>allBtns.forEach(b=>{if(b){b.textContent=txt;b.disabled=dis;}});
-
-  if(!window.MediaRecorder){
-    alert('Your browser does not support MediaRecorder.\nPlease use Chrome or Edge.');
-    return;
-  }
-
+// ─── SHARED RENDER ENGINE ────────────────────────────────────────────────────
+// Renders all frames onto an offscreen canvas, calling onFrame(offCanvas, pct) each frame
+async function renderAllFrames(onFrame, onDone){
   const lines=parseScript(document.getElementById('scriptInput').value);
-  if(!lines.length){ alert('No script lines to export!'); return; }
+  if(!lines.length){ alert('No script lines to export!'); return false; }
 
-  if(raf)cancelAnimationFrame(raf);
-  setBtn('⏳ Starting…', true);
+  if(raf) cancelAnimationFrame(raf);
 
   const FPS=S.fps;
   const frameDurMs=1000/FPS;
 
-  // Build an offscreen canvas identical in size to the main one
   const offCanvas=document.createElement('canvas');
-  offCanvas.width=canvas.width;
-  offCanvas.height=canvas.height;
+  offCanvas.width=canvas.width; offCanvas.height=canvas.height;
   const offCtx=offCanvas.getContext('2d');
 
-  // Temporarily swap the global ctx/canvas so all draw calls go to offscreen
   const _realCanvas=canvas, _realCtx=ctx;
   canvas=offCanvas; ctx=offCtx;
 
-  // Rebuild line data on the offscreen canvas size
   const ldArr=lines.map((l,i)=>buildLineData(l,globalSeed*997+i*3571));
   ldArr.forEach(ld=>layoutWords(ld));
 
-  // Pick the best supported mime type
-  const mimes=['video/webm;codecs=vp9','video/webm;codecs=vp8','video/webm','video/mp4'];
-  const mimeType=mimes.find(m=>MediaRecorder.isTypeSupported(m))||'video/webm';
-  const ext=mimeType.includes('mp4')?'mp4':'webm';
-
-  const chunks=[];
-  const stream=offCanvas.captureStream(FPS);
-  const recorder=new MediaRecorder(stream,{mimeType,videoBitsPerSecond:8_000_000});
-  recorder.ondataavailable=e=>{ if(e.data&&e.data.size>0) chunks.push(e.data); };
-  const done=new Promise(res=>{ recorder.onstop=res; });
-  recorder.start(100); // collect chunks every 100ms
-
-  let fakeTime=0;
-  let totalFrames=0;
-
-  // Calculate total frames for progress display
   const totalFrameCount=ldArr.reduce((sum,ld)=>{
-    const inF=Math.ceil((ld.words.length*S.wDelay+700)/frameDurMs);
-    const hF=Math.ceil(S.holdDur/frameDurMs);
-    const eF=Math.ceil(S.exitDur/frameDurMs);
-    return sum+inF+hF+eF;
+    return sum+Math.ceil((ld.words.length*S.wDelay+700)/frameDurMs)
+              +Math.ceil(S.holdDur/frameDurMs)
+              +Math.ceil(S.exitDur/frameDurMs);
   },0);
+
+  let fakeTime=0, totalFrames=0;
 
   for(let idx=0;idx<ldArr.length;idx++){
     const ld=ldArr[idx];
     ld.words.forEach(w=>{w._particled=false;w.entered=false;});
-
     const inF=Math.ceil((ld.words.length*S.wDelay+700)/frameDurMs);
     const hF=Math.ceil(S.holdDur/frameDurMs);
     const eF=Math.ceil(S.exitDur/frameDurMs);
 
-    // ── IN phase ──
     for(let f=0;f<inF;f++){
-      const el=(f/FPS)*1000;
-      fakeTime+=frameDurMs;
-      offCtx.clearRect(0,0,offCanvas.width,offCanvas.height);
-      window.drawBg();
-      ld.words.forEach((w,i)=>{
-        const wS=i*S.wDelay; if(el<wS)return;
-        const prog=(el-wS)*1.4;
-        window.drawWord(w,prog,fakeTime);
-        if(prog>380)w.entered=true;
-      });
+      const el=(f/FPS)*1000; fakeTime+=frameDurMs;
+      offCtx.clearRect(0,0,offCanvas.width,offCanvas.height); window.drawBg();
+      ld.words.forEach((w,i)=>{const wS=i*S.wDelay;if(el<wS)return;const prog=(el-wS)*1.4;window.drawWord(w,prog,fakeTime);if(prog>380)w.entered=true;});
       totalFrames++;
-      const pct=Math.round(totalFrames/totalFrameCount*100);
-      setBtn(`⏳ Rendering ${pct}%`, true);
-      await new Promise(r=>setTimeout(r,frameDurMs));
+      await onFrame(offCanvas, Math.round(totalFrames/totalFrameCount*100), totalFrames);
     }
-
-    // ── HOLD phase ──
     for(let f=0;f<hF;f++){
       fakeTime+=frameDurMs;
-      offCtx.clearRect(0,0,offCanvas.width,offCanvas.height);
-      window.drawBg();
+      offCtx.clearRect(0,0,offCanvas.width,offCanvas.height); window.drawBg();
       ld.words.forEach(w=>window.drawWord(w,9999,fakeTime));
       totalFrames++;
-      const pct=Math.round(totalFrames/totalFrameCount*100);
-      setBtn(`⏳ Rendering ${pct}%`, true);
-      await new Promise(r=>setTimeout(r,frameDurMs));
+      await onFrame(offCanvas, Math.round(totalFrames/totalFrameCount*100), totalFrames);
     }
-
-    // ── EXIT phase ──
     for(let f=0;f<eF;f++){
       fakeTime+=frameDurMs;
-      offCtx.clearRect(0,0,offCanvas.width,offCanvas.height);
-      window.drawBg();
+      offCtx.clearRect(0,0,offCanvas.width,offCanvas.height); window.drawBg();
       drawExit(ld,f/eF);
       totalFrames++;
-      const pct=Math.round(totalFrames/totalFrameCount*100);
-      setBtn(`⏳ Rendering ${pct}%`, true);
-      await new Promise(r=>setTimeout(r,frameDurMs));
+      await onFrame(offCanvas, Math.round(totalFrames/totalFrameCount*100), totalFrames);
     }
   }
 
-  // Stop recording and wait for final chunks
-  recorder.stop();
-  await done;
-
-  // Restore real canvas/ctx
   canvas=_realCanvas; ctx=_realCtx;
+  await onDone(totalFrames);
+  startAnim();
+  return true;
+}
 
-  // Build blob and trigger download
-  const blob=new Blob(chunks,{type:mimeType});
+function setExportProgress(pct, txt){
+  const bar=document.getElementById('exportProgressBar');
+  const label=document.getElementById('exportProgressTxt');
+  const wrap=document.getElementById('exportProgress');
+  if(wrap) wrap.style.display='block';
+  if(bar) bar.style.width=pct+'%';
+  if(label) label.textContent=txt;
+}
+function hideExportProgress(){ const w=document.getElementById('exportProgress'); if(w) w.style.display='none'; }
+function triggerDownload(blob, filename){
   const url=URL.createObjectURL(blob);
   const a=document.createElement('a');
-  a.href=url;
-  a.download=`typoreel_export.${ext}`;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  setTimeout(()=>URL.revokeObjectURL(url),10000);
+  a.href=url; a.download=filename;
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  setTimeout(()=>URL.revokeObjectURL(url),15000);
+}
+function setBtnLabel(id, txt, dis){ const b=document.getElementById(id); if(b){b.textContent=txt;b.disabled=dis;} }
 
+// ─── EXPORT MP4 ──────────────────────────────────────────────────────────────
+async function doExport(){
+  if(!window.MediaRecorder){ alert('MediaRecorder not supported. Use Chrome or Edge.'); return; }
+  setBtnLabel('exportBtn','⏳ 0%',true);
+  setBtnLabel('exportBtnSec','⏳ 0%',true);
+  setExportProgress(0,'Starting MP4 recording…');
+
+  const mimes=['video/webm;codecs=vp9','video/webm;codecs=vp8','video/webm','video/mp4'];
+  const mimeType=mimes.find(m=>MediaRecorder.isTypeSupported(m))||'video/webm';
+  const ext=mimeType.includes('mp4')?'mp4':'webm';
+
+  // We need a live canvas for captureStream — set up before rendering
+  const lines=parseScript(document.getElementById('scriptInput').value);
+  if(!lines.length){ alert('No script lines!'); return; }
+  if(raf) cancelAnimationFrame(raf);
+
+  const FPS=S.fps, frameDurMs=1000/FPS;
+  const offCanvas=document.createElement('canvas');
+  offCanvas.width=canvas.width; offCanvas.height=canvas.height;
+  const offCtx=offCanvas.getContext('2d');
+  const _rc=canvas,_rx=ctx; canvas=offCanvas; ctx=offCtx;
+  const ldArr=lines.map((l,i)=>buildLineData(l,globalSeed*997+i*3571));
+  ldArr.forEach(ld=>layoutWords(ld));
+  const totalFrameCount=ldArr.reduce((s,ld)=>s+Math.ceil((ld.words.length*S.wDelay+700)/frameDurMs)+Math.ceil(S.holdDur/frameDurMs)+Math.ceil(S.exitDur/frameDurMs),0);
+
+  const chunks=[];
+  const stream=offCanvas.captureStream(FPS);
+  const recorder=new MediaRecorder(stream,{mimeType,videoBitsPerSecond:8_000_000});
+  recorder.ondataavailable=e=>{if(e.data&&e.data.size>0)chunks.push(e.data);};
+  const recDone=new Promise(res=>{recorder.onstop=res;});
+  recorder.start(100);
+
+  let fakeTime=0,totalFrames=0;
+  for(let idx=0;idx<ldArr.length;idx++){
+    const ld=ldArr[idx]; ld.words.forEach(w=>{w._particled=false;w.entered=false;});
+    const inF=Math.ceil((ld.words.length*S.wDelay+700)/frameDurMs);
+    const hF=Math.ceil(S.holdDur/frameDurMs);
+    const eF=Math.ceil(S.exitDur/frameDurMs);
+    for(let f=0;f<inF;f++){
+      const el=(f/FPS)*1000;fakeTime+=frameDurMs;
+      offCtx.clearRect(0,0,offCanvas.width,offCanvas.height);window.drawBg();
+      ld.words.forEach((w,i)=>{const wS=i*S.wDelay;if(el<wS)return;const prog=(el-wS)*1.4;window.drawWord(w,prog,fakeTime);if(prog>380)w.entered=true;});
+      totalFrames++;const pct=Math.round(totalFrames/totalFrameCount*100);
+      setBtnLabel('exportBtn',`⏳ ${pct}%`,true);setBtnLabel('exportBtnSec',`⏳ ${pct}%`,true);
+      setExportProgress(pct,`MP4 · Frame ${totalFrames}/${totalFrameCount}`);
+      await new Promise(r=>setTimeout(r,frameDurMs));
+    }
+    for(let f=0;f<hF;f++){
+      fakeTime+=frameDurMs;offCtx.clearRect(0,0,offCanvas.width,offCanvas.height);window.drawBg();
+      ld.words.forEach(w=>window.drawWord(w,9999,fakeTime));
+      totalFrames++;const pct=Math.round(totalFrames/totalFrameCount*100);
+      setBtnLabel('exportBtn',`⏳ ${pct}%`,true);setBtnLabel('exportBtnSec',`⏳ ${pct}%`,true);
+      setExportProgress(pct,`MP4 · Frame ${totalFrames}/${totalFrameCount}`);
+      await new Promise(r=>setTimeout(r,frameDurMs));
+    }
+    for(let f=0;f<eF;f++){
+      fakeTime+=frameDurMs;offCtx.clearRect(0,0,offCanvas.width,offCanvas.height);window.drawBg();
+      drawExit(ld,f/eF);
+      totalFrames++;const pct=Math.round(totalFrames/totalFrameCount*100);
+      setBtnLabel('exportBtn',`⏳ ${pct}%`,true);setBtnLabel('exportBtnSec',`⏳ ${pct}%`,true);
+      setExportProgress(pct,`MP4 · Frame ${totalFrames}/${totalFrameCount}`);
+      await new Promise(r=>setTimeout(r,frameDurMs));
+    }
+  }
+  recorder.stop(); await recDone;
+  canvas=_rc; ctx=_rx;
+  const blob=new Blob(chunks,{type:mimeType});
+  triggerDownload(blob,`typoreel.${ext}`);
   const secs=(totalFrames/FPS).toFixed(1);
-  setBtn(`✓ Downloaded (${secs}s)`, false);
-  setTimeout(()=>setBtn('⬇ DOWNLOAD MP4', false), 3000);
-
+  setBtnLabel('exportBtn',`🎬 MP4`,false);setBtnLabel('exportBtnSec',`✓ Done (${secs}s)`,false);
+  setExportProgress(100,`✓ MP4 downloaded — ${secs}s · ${totalFrames} frames`);
+  setTimeout(()=>{setBtnLabel('exportBtnSec','🎬 DOWNLOAD MP4',false);hideExportProgress();},4000);
   startAnim();
+}
+
+// ─── EXPORT GIF ──────────────────────────────────────────────────────────────
+async function doExportGif(){
+  setBtnLabel('exportGifBtn','⏳ 0%',true);
+  setExportProgress(0,'Building GIF encoder…');
+
+  // Inline minimal GIF encoder (LZW + GIF89a spec)
+  // Produces a real animated GIF from canvas frames
+  const gifFrames=[];
+  const gifFPS=Math.min(S.fps,15); // cap at 15fps for reasonable GIF size
+  const gifDelay=Math.round(100/gifFPS); // GIF delay in centiseconds
+
+  // We'll collect every Nth frame to match gifFPS
+  const skipEvery=Math.round(S.fps/gifFPS);
+  let frameIdx=0;
+
+  setExportProgress(5,'Rendering frames…');
+  await renderAllFrames(
+    async(offCanvas, pct)=>{
+      frameIdx++;
+      if(frameIdx % skipEvery !== 0) return;
+      // Sample canvas at reduced size for GIF (max 480px wide)
+      const maxW=Math.min(offCanvas.width,480);
+      const scale=maxW/offCanvas.width;
+      const w=Math.round(offCanvas.width*scale);
+      const h=Math.round(offCanvas.height*scale);
+      const tmp=document.createElement('canvas');
+      tmp.width=w; tmp.height=h;
+      const tc=tmp.getContext('2d');
+      tc.drawImage(offCanvas,0,0,w,h);
+      gifFrames.push({imageData:tc.getImageData(0,0,w,h),delay:gifDelay,w,h});
+      setBtnLabel('exportGifBtn',`⏳ ${Math.round(pct*0.7)}%`,true);
+      setExportProgress(Math.round(pct*0.7),`GIF · Capturing frame ${gifFrames.length}…`);
+    },
+    async(totalF)=>{
+      setExportProgress(72,'Encoding GIF…');
+      setBtnLabel('exportGifBtn','⏳ Encoding…',true);
+      const gifBlob=await encodeGif(gifFrames);
+      triggerDownload(gifBlob,'typoreel.gif');
+      const secs=(totalF/S.fps).toFixed(1);
+      setBtnLabel('exportGifBtn','🎞 EXPORT GIF',false);
+      setExportProgress(100,`✓ GIF downloaded — ${gifFrames.length} frames · ${secs}s`);
+      setTimeout(hideExportProgress,4000);
+    }
+  );
+}
+
+// Pure-JS GIF89a encoder
+async function encodeGif(frames){
+  if(!frames.length) return new Blob([]);
+  const {w,h}=frames[0];
+
+  // ── NeuQuant colour quantiser (256 colours) ──
+  function quantize(pixels){
+    const nc=256;
+    const palette=[];
+    // Simple median-cut approximation via histogram bucketing
+    const hist=new Uint32Array(262144); // 6-bit RGB → index
+    for(let i=0;i<pixels.length;i+=4){
+      const r=pixels[i]>>2,g=pixels[i+1]>>2,b=pixels[i+2]>>2;
+      hist[(r<<12)|(g<<6)|b]++;
+    }
+    // collect top colours
+    const sorted=[...hist.entries()].filter(([,v])=>v>0).sort((a,b)=>b[1]-a[1]).slice(0,nc);
+    sorted.forEach(([k])=>{palette.push(((k>>12)&63)<<2,((k>>6)&63)<<2,(k&63)<<2);});
+    while(palette.length<nc*3) palette.push(0,0,0);
+    // build lookup for nearest-colour
+    function nearest(r,g,b){
+      let best=0,bestD=1e9;
+      for(let i=0;i<nc;i++){
+        const dr=r-palette[i*3],dg=g-palette[i*3+1],db=b-palette[i*3+2];
+        const d=dr*dr+dg*dg+db*db;
+        if(d<bestD){bestD=d;best=i;}
+      }
+      return best;
+    }
+    const indexed=new Uint8Array(pixels.length/4);
+    for(let i=0;i<pixels.length;i+=4) indexed[i>>2]=nearest(pixels[i],pixels[i+1],pixels[i+2]);
+    return{palette:new Uint8Array(palette),indexed};
+  }
+
+  // ── LZW encoder ──
+  function lzwEncode(pixels,minCodeSize){
+    const clearCode=1<<minCodeSize;
+    const eoi=clearCode+1;
+    const table=new Map();
+    const out=[];
+    let bits=0,buf=0,codeSize=minCodeSize+1,nextCode=eoi+1;
+    const write=c=>{buf|=c<<bits;bits+=codeSize;while(bits>=8){out.push(buf&255);buf>>=8;bits-=8;}};
+    const reset=()=>{table.clear();for(let i=0;i<clearCode+2;i++)table.set(String(i),i);codeSize=minCodeSize+1;nextCode=eoi+1;};
+    reset(); write(clearCode);
+    let str=String(pixels[0]);
+    for(let i=1;i<pixels.length;i++){
+      const nc2=str+','+pixels[i];
+      if(table.has(nc2)){str=nc2;}
+      else{
+        write(table.get(str));
+        if(nextCode<4096){table.set(nc2,nextCode++);if(nextCode>(1<<codeSize)&&codeSize<12)codeSize++;}
+        else{write(clearCode);reset();}
+        str=String(pixels[i]);
+      }
+    }
+    write(table.get(str)); write(eoi);
+    if(bits>0){out.push(buf&255);}
+    return new Uint8Array(out);
+  }
+
+  // ── Pack LZW into GIF sub-blocks ──
+  function packBlocks(lzw){
+    const blocks=[];
+    for(let i=0;i<lzw.length;i+=255){
+      const chunk=lzw.slice(i,i+255);
+      blocks.push(chunk.length,...chunk);
+    }
+    blocks.push(0);
+    return new Uint8Array(blocks);
+  }
+
+  // ── Build GIF binary ──
+  const minCode=8;
+  const parts=[];
+  // Header
+  parts.push(new TextEncoder().encode('GIF89a'));
+  // Logical Screen Descriptor
+  const lsd=new Uint8Array(7);
+  new DataView(lsd.buffer).setUint16(0,w,true);
+  new DataView(lsd.buffer).setUint16(2,h,true);
+  lsd[4]=0xF7; lsd[5]=0; lsd[6]=0; // global colour table flag, 256 colours
+  parts.push(lsd);
+
+  // Quantise first frame for global palette
+  const {palette}=quantize(frames[0].imageData.data);
+  parts.push(palette);
+
+  // Netscape loop extension
+  parts.push(new Uint8Array([0x21,0xFF,0x0B,...new TextEncoder().encode('NETSCAPE2.0'),0x03,0x01,0x00,0x00,0x00]));
+
+  for(const frame of frames){
+    // Graphic Control Extension
+    const gce=new Uint8Array([0x21,0xF9,0x04,0x00,frame.delay&0xFF,(frame.delay>>8)&0xFF,0x00,0x00]);
+    parts.push(gce);
+    // Image Descriptor
+    const id=new Uint8Array(10);
+    id[0]=0x2C;
+    new DataView(id.buffer).setUint16(1,0,true);
+    new DataView(id.buffer).setUint16(3,0,true);
+    new DataView(id.buffer).setUint16(5,frame.w,true);
+    new DataView(id.buffer).setUint16(7,frame.h,true);
+    id[9]=0x00;
+    parts.push(id);
+    // Pixel data
+    const {indexed}=quantize(frame.imageData.data);
+    const lzw=lzwEncode(indexed,minCode);
+    parts.push(new Uint8Array([minCode]));
+    parts.push(packBlocks(lzw));
+    // Small yield to keep UI alive
+    await new Promise(r=>setTimeout(r,0));
+    setExportProgress(72+Math.round((frames.indexOf(frame)/frames.length)*26),'Encoding GIF frames…');
+  }
+  // Trailer
+  parts.push(new Uint8Array([0x3B]));
+
+  const total=parts.reduce((s,p)=>s+p.length,0);
+  const out=new Uint8Array(total);
+  let offset=0;
+  for(const p of parts){out.set(p,offset);offset+=p.length;}
+  return new Blob([out],{type:'image/gif'});
+}
+
+// ─── EXPORT FRAMES (PNG ZIP) ──────────────────────────────────────────────────
+async function doExportFrames(){
+  setBtnLabel('exportFramesBtn','⏳ 0%',true);
+  setExportProgress(0,'Collecting frames…');
+
+  const pngFrames=[];
+  await renderAllFrames(
+    async(offCanvas, pct, frameN)=>{
+      pngFrames.push({data:offCanvas.toDataURL('image/png'),n:frameN});
+      setBtnLabel('exportFramesBtn',`⏳ ${pct}%`,true);
+      setExportProgress(pct,`Frames · Capturing ${frameN}…`);
+    },
+    async(totalF)=>{
+      setExportProgress(95,'Building ZIP…');
+      // Load JSZip dynamically
+      await new Promise((res,rej)=>{
+        if(window.JSZip){res();return;}
+        const sc=document.createElement('script');
+        sc.src='https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js';
+        sc.onload=res; sc.onerror=rej;
+        document.head.appendChild(sc);
+      });
+      const zip=new JSZip();
+      const folder=zip.folder('typoreel_frames');
+      pngFrames.forEach(fr=>folder.file(`frame_${String(fr.n).padStart(5,'0')}.png`,fr.data.split(',')[1],{base64:true}));
+      const blob=await zip.generateAsync({type:'blob'});
+      triggerDownload(blob,'typoreel_frames.zip');
+      setBtnLabel('exportFramesBtn','🗂 EXPORT FRAMES',false);
+      setExportProgress(100,`✓ ZIP downloaded — ${pngFrames.length} PNG frames`);
+      setTimeout(hideExportProgress,4000);
+    }
+  );
 }
 
 // ─── WIRING ──────────────────────────────────────────────────────────────────
@@ -695,8 +923,7 @@ document.getElementById('rerollBtn').addEventListener('click',()=>{
 
   startAnim();
 });
-document.getElementById('exportBtn').addEventListener('click',doExport);
-document.getElementById('exportBtnSec').addEventListener('click',doExport);
+// export buttons wired via onclick attributes in HTML
 document.querySelectorAll('.fx-card').forEach(c=>{c.addEventListener('click',()=>{c.classList.toggle('active');if(c.classList.contains('active'))S.activeFx.add(c.dataset.fx);else{S.activeFx.delete(c.dataset.fx);if(S.activeFx.size===0){c.classList.add('active');S.activeFx.add(c.dataset.fx);}}document.getElementById('fxPill').textContent=[...S.activeFx].join(' + ').toUpperCase();startAnim();});});
 document.querySelectorAll('[data-mix]').forEach(b=>{b.addEventListener('click',()=>{document.querySelectorAll('[data-mix]').forEach(x=>x.classList.remove('active'));b.classList.add('active');S.fxMix=b.dataset.mix;startAnim();});});
 document.querySelectorAll('[data-int]').forEach(b=>{b.addEventListener('click',()=>{b.closest('.int-row').querySelectorAll('[data-int]').forEach(x=>x.classList.remove('active'));b.classList.add('active');S.glowInt=b.dataset.int;startAnim();});});
