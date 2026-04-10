@@ -3,18 +3,19 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>TypoReel</title>
+<title>TypoReel v4 – Premium</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Playfair+Display:ital,wght@0,900;1,700&family=Dancing+Script:wght@700&family=Orbitron:wght@900&family=Abril+Fatface&family=Righteous&family=Pacifico&family=Oswald:wght@300;400;700&family=Black+Han+Sans&family=Permanent+Marker&family=Russo+One&family=Staatliches&family=Lobster&family=Bangers&family=Cinzel:wght@900&family=Cormorant+Garamond:ital,wght@0,700;1,700&family=Montserrat:wght@900&family=Press+Start+2P&family=VT323&family=Silkscreen&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="typoreel.css">
 </head>
 <body>
 <header>
-  <div class="logo"><h1>TYPOREEL</h1><span class="vtag">projecloom(gtihub)</span></div>
+  <div class="logo"><h1>TYPOREEL</h1><span class="vtag">v4 · PREMIUM</span></div>
   <div class="hbtns">
-    <button class="hbtn hbtn-ghost" id="exportBtn" onclick="doExport()">🎬 MP4</button>
-    <button class="hbtn hbtn-ghost" style="padding:5px 10px" onclick="doExportGif()">🎞 GIF</button>
-    <button class="hbtn hbtn-ghost" style="padding:5px 10px" onclick="doExportFrames()">🗂 FRAMES</button>
+    <button class="hbtn hbtn-ghost" id="shadowToggleBtn" onclick="toggleShadow()">⬛ SHADOW: OFF</button>
+    <button class="hbtn hbtn-ghost" id="exportBtn">⬇ DOWNLOAD MP4</button>
+    <button class="hbtn hbtn-ghost" id="exportFramesBtn">📁 EXPORT FRAMES</button>
+    <button class="hbtn hbtn-ghost" id="exportGifBtn">🎞️ EXPORT GIF</button>
     <button class="hbtn hbtn-gold" id="playBtn">▶ GENERATE</button>
   </div>
 </header>
@@ -74,15 +75,17 @@
         <span class="tog-lbl">Transparent BG</span>
         <label class="tog"><input type="checkbox" id="togTransparent" checked><div class="tog-track"></div><div class="tog-thumb"></div></label>
       </div>
-      <div style="display:flex;flex-direction:column;gap:5px;margin-top:6px">
-        <button id="exportBtnSec" onclick="doExport()" style="width:100%;padding:8px;font-size:9.5px;font-weight:700;letter-spacing:1px;cursor:pointer;background:var(--titlebar);color:#fff;border:1.5px solid rgba(0,0,0,.2);font-family:'Oswald',sans-serif;text-transform:uppercase;box-shadow:2px 2px 0 #8a4820;transition:all .1s">🎬 DOWNLOAD MP4</button>
-        <button id="exportGifBtn" onclick="doExportGif()" style="width:100%;padding:8px;font-size:9.5px;font-weight:700;letter-spacing:1px;cursor:pointer;background:var(--yellow);color:#261c10;border:1.5px solid rgba(0,0,0,.2);font-family:'Oswald',sans-serif;text-transform:uppercase;box-shadow:2px 2px 0 #8a6800;transition:all .1s">🎞 EXPORT GIF</button>
-        <button id="exportFramesBtn" onclick="doExportFrames()" style="width:100%;padding:8px;font-size:9.5px;font-weight:700;letter-spacing:1px;cursor:pointer;background:var(--panel2);color:var(--sub);border:1.5px solid var(--border);font-family:'Oswald',sans-serif;text-transform:uppercase;box-shadow:2px 2px 0 var(--border);transition:all .1s">🗂 EXPORT FRAMES</button>
+      <div style="background:var(--panel2);border:2px solid var(--border);padding:10px;border-radius:8px;margin-top:8px">
+        <div style="font-size:9px;color:var(--text);font-family:'Bangers',cursive;margin-bottom:6px">📹 HOW TO EXPORT MP4:</div>
+        <div style="font-size:8px;color:var(--sub);line-height:1.5;font-family:'Bangers',cursive">
+          1️⃣ Write your script in the Script tab<br>
+          2️⃣ Click <strong>▶ GENERATE</strong> to preview<br>
+          3️⃣ Click <strong>⬇ DOWNLOAD MP4</strong> button<br>
+          4️⃣ Video renders in-browser &amp; auto-downloads!<br>
+          <em style="color:var(--green)">✓ No upload required • 100% private</em>
+        </div>
       </div>
-      <div id="exportProgress" style="display:none;margin-top:8px;padding:7px;background:var(--panel2);border:1px solid var(--border);font-size:9px;font-family:monospace;color:var(--sub)">
-        <div id="exportProgressBar" style="height:4px;background:var(--titlebar);width:0%;transition:width .2s;margin-bottom:4px"></div>
-        <span id="exportProgressTxt">Preparing…</span>
-      </div>
+      <button class="hbtn hbtn-ghost" id="exportBtnSec" style="width:100%;margin-top:8px;font-size:10px">⬇ DOWNLOAD MP4</button>
     </div>
   </div>
 
@@ -237,9 +240,9 @@
     <div class="sec">
       <div class="stitle">Shadow Intensity</div>
       <div class="int-row" id="shadowIntRow">
-        <div class="int-btn" data-sint="none">None</div>
+        <div class="int-btn active" data-sint="none">None</div>
         <div class="int-btn" data-sint="light">Light</div>
-        <div class="int-btn active" data-sint="med">Med</div>
+        <div class="int-btn" data-sint="med">Med</div>
         <div class="int-btn" data-sint="heavy">Heavy</div>
         <div class="int-btn" data-sint="ultra">Ultra</div>
       </div>
@@ -320,6 +323,12 @@
 <!-- PREVIEW -->
 <div class="preview">
   <div class="anim-info" id="animInfo">ready</div>
+  <div id="exportProgress" style="display:none;position:absolute;top:50px;left:50%;transform:translateX(-50%);background:var(--panel);border:3px solid var(--border);border-radius:8px;padding:8px 16px;z-index:100;box-shadow:4px 4px 0 var(--btn-shadow)">
+    <div style="font-size:9px;color:var(--text);font-family:'Bangers',cursive;margin-bottom:4px" id="exportProgressTxt">Exporting...</div>
+    <div style="width:150px;height:10px;background:var(--border);border-radius:5px;overflow:hidden">
+      <div id="exportProgressBar" style="width:0%;height:100%;background:var(--green);transition:width 0.1s"></div>
+    </div>
+  </div>
   <div class="canvas-outer">
     <div class="checker" id="checkerBg"></div>
     <canvas id="c" width="360" height="640"></canvas>
@@ -429,6 +438,186 @@
 </div>
 </div>
 
-<script src="typoreel.js"></script>
+<script>
+// Export Frames Functionality
+window.addEventListener('DOMContentLoaded', function() {
+  const exportFramesBtn = document.getElementById('exportFramesBtn');
+  const exportGifBtn = document.getElementById('exportGifBtn');
+  
+  // Export as Frame Sequence
+  if (exportFramesBtn) {
+    exportFramesBtn.addEventListener('click', async function() {
+      if (!window.canv) {
+        alert('Please generate the animation first by clicking GENERATE');
+        return;
+      }
+      
+      exportFramesBtn.textContent = '⏳ Exporting Frames...';
+      exportFramesBtn.disabled = true;
+      
+      try {
+        const fps = parseInt(document.getElementById('fpsSlider')?.value || 24);
+        const duration = parseFloat(document.getElementById('statDur')?.textContent || 0);
+        const totalFrames = Math.ceil(duration * fps);
+        
+        if (totalFrames === 0) {
+          alert('No frames to export. Generate animation first.');
+          exportFramesBtn.textContent = '📁 EXPORT FRAMES';
+          exportFramesBtn.disabled = false;
+          return;
+        }
+        
+        // Use JSZip for creating zip file
+        const script = document.createElement('script');
+        script.src = 'https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js';
+        document.head.appendChild(script);
+        
+        await new Promise(resolve => script.onload = resolve);
+        
+        const zip = new JSZip();
+        const frameFolder = zip.folder('frames');
+        
+        // Capture each frame
+        for (let i = 0; i < totalFrames; i++) {
+          const progress = ((i + 1) / totalFrames * 100).toFixed(0);
+          exportFramesBtn.textContent = `⏳ Capturing ${i + 1}/${totalFrames} (${progress}%)`;
+          
+          // Seek to frame time
+          const timeInSeconds = i / fps;
+          if (window.ENGINE && window.ENGINE.seekToTime) {
+            window.ENGINE.seekToTime(timeInSeconds);
+          }
+          
+          // Small delay to ensure render
+          await new Promise(r => setTimeout(r, 50));
+          
+          // Capture frame as PNG
+          const dataUrl = window.canv.toDataURL('image/png');
+          const base64Data = dataUrl.split(',')[1];
+          
+          // Add to zip with zero-padded filename
+          const frameName = `frame_${String(i).padStart(5, '0')}.png`;
+          frameFolder.file(frameName, base64Data, {base64: true});
+        }
+        
+        // Generate and download zip
+        exportFramesBtn.textContent = '⏳ Creating ZIP...';
+        const blob = await zip.generateAsync({type: 'blob'});
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `typoreel_frames_${Date.now()}.zip`;
+        a.click();
+        URL.revokeObjectURL(url);
+        
+        exportFramesBtn.textContent = '✅ Frames Exported!';
+        setTimeout(() => {
+          exportFramesBtn.textContent = '📁 EXPORT FRAMES';
+          exportFramesBtn.disabled = false;
+        }, 2000);
+        
+      } catch (error) {
+        console.error('Frame export error:', error);
+        alert('Error exporting frames: ' + error.message);
+        exportFramesBtn.textContent = '📁 EXPORT FRAMES';
+        exportFramesBtn.disabled = false;
+      }
+    });
+  }
+  
+  // Export as GIF
+  if (exportGifBtn) {
+    exportGifBtn.addEventListener('click', async function() {
+      if (!window.canv) {
+        alert('Please generate the animation first by clicking GENERATE');
+        return;
+      }
+      
+      exportGifBtn.textContent = '⏳ Creating GIF...';
+      exportGifBtn.disabled = true;
+      
+      try {
+        // Load gif.js library
+        const script = document.createElement('script');
+        script.src = 'https://cdnjs.cloudflare.com/ajax/libs/gif.js/0.2.0/gif.js';
+        document.head.appendChild(script);
+        
+        await new Promise(resolve => script.onload = resolve);
+        
+        const fps = parseInt(document.getElementById('fpsSlider')?.value || 24);
+        const duration = parseFloat(document.getElementById('statDur')?.textContent || 0);
+        const totalFrames = Math.ceil(duration * fps);
+        
+        if (totalFrames === 0) {
+          alert('No frames to export. Generate animation first.');
+          exportGifBtn.textContent = '🎞️ EXPORT GIF';
+          exportGifBtn.disabled = false;
+          return;
+        }
+        
+        // Create GIF encoder
+        const gif = new GIF({
+          workers: 2,
+          quality: 10,
+          width: window.canv.width,
+          height: window.canv.height,
+          workerScript: 'https://cdnjs.cloudflare.com/ajax/libs/gif.js/0.2.0/gif.worker.js'
+        });
+        
+        const delay = 1000 / fps;
+        
+        // Capture frames
+        for (let i = 0; i < totalFrames; i++) {
+          const progress = ((i + 1) / totalFrames * 100).toFixed(0);
+          exportGifBtn.textContent = `⏳ Capturing ${i + 1}/${totalFrames} (${progress}%)`;
+          
+          const timeInSeconds = i / fps;
+          if (window.ENGINE && window.ENGINE.seekToTime) {
+            window.ENGINE.seekToTime(timeInSeconds);
+          }
+          
+          await new Promise(r => setTimeout(r, 50));
+          
+          // Create temporary canvas for this frame
+          const tempCanvas = document.createElement('canvas');
+          tempCanvas.width = window.canv.width;
+          tempCanvas.height = window.canv.height;
+          const tempCtx = tempCanvas.getContext('2d');
+          tempCtx.drawImage(window.canv, 0, 0);
+          
+          gif.addFrame(tempCanvas, {delay: delay, copy: true});
+        }
+        
+        exportGifBtn.textContent = '⏳ Encoding GIF...';
+        
+        gif.on('finished', function(blob) {
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = `typoreel_${Date.now()}.gif`;
+          a.click();
+          URL.revokeObjectURL(url);
+          
+          exportGifBtn.textContent = '✅ GIF Exported!';
+          setTimeout(() => {
+            exportGifBtn.textContent = '🎞️ EXPORT GIF';
+            exportGifBtn.disabled = false;
+          }, 2000);
+        });
+        
+        gif.render();
+        
+      } catch (error) {
+        console.error('GIF export error:', error);
+        alert('Error exporting GIF: ' + error.message);
+        exportGifBtn.textContent = '🎞️ EXPORT GIF';
+        exportGifBtn.disabled = false;
+      }
+    });
+  }
+});
+</script>
+
+<script src="typoreel.js"></script>  
 </body>
 </html>
