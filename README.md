@@ -1,4 +1,4 @@
-TypoReel <assited by AI>
+TypoReel assited by AI
 ========
 
 Overview
